@@ -14,7 +14,7 @@ class Centernet(nn.Module):
 
 class Centernet_decoder(nn.module):
     def __init__(self, inplanes=2048, bn_momentum=0.1):
-        super(resnet50Decoder, self).__init__()
+        super(Centernet_decoder, self).__init__()
         self.bn_momentum = bn_momentum
         self.inplanes = inplanes
         self.deconv_with_bias = False
