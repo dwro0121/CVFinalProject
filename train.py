@@ -37,10 +37,12 @@ def fit_one_epoch(net, epoch, epoch_size, epoch_size_val, gen, genval, Epoch, cu
     total_loss = 0
     val_loss = 0
     start_time = time.time()
-
+    print('epoch_size = {}'.format(epoch_size))
+    print('epoch_size_val = {}'.format(epoch_size_val))
     net.train()
     with tqdm(total=epoch_size, desc=f'Epoch {epoch + 1}/{Epoch}', postfix=dict, mininterval=0.3) as pbar:
         for iteration, batch in enumerate(gen):
+            print('train iteration = {}'.format(iteration))
             if iteration >= epoch_size:
                 break
 
@@ -104,6 +106,7 @@ def fit_one_epoch(net, epoch, epoch_size, epoch_size_val, gen, genval, Epoch, cu
     print('Start Validation')
     with tqdm(total=epoch_size_val, desc=f'Epoch {epoch + 1}/{Epoch}', postfix=dict, mininterval=0.3) as pbar:
         for iteration, batch in enumerate(genval):
+            print('val iteration = {}'.format(iteration))
             if iteration >= epoch_size_val:
                 break
             with torch.no_grad():
@@ -216,8 +219,8 @@ if __name__ == "__main__":
     # np.random.seed(10101)
     # np.random.shuffle(lines)
     # np.random.seed(None)
-    num_val = len(train_lines)
-    num_train = len(valid_lines)
+    num_val = len(valid_lines)
+    num_train = len(train_lines)
 
     # ------------------------------------------------------#
     #   主干特征提取网络特征通用，冻结训练可以加快训练速度
