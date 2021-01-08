@@ -3,10 +3,10 @@ from .backbone import Resnet_Backbone
 
 class Centernet(nn.Module):
 
-    def __init__(self, num_classes=80):
+    def __init__(self, num_classes=80, pretrain=True):
         super(Centernet, self).__init__()
         self.num_classes = num_classes
-        self.backbone = Resnet_Backbone('resnet18',True)
+        self.backbone = Resnet_Backbone('resnet18',pretrain)
         self.decoder = Centernet_decoder(512)
         self.header = Centernet_header(num_classes=self.num_classes)
 

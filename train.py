@@ -1,24 +1,18 @@
 import os
 import time
 from pathlib import Path
-import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model.centernet import Centernet
-from model.losses import focal_loss, l1_loss
+from utils.losses import focal_loss, l1_loss
 from dataloader import CenternetDataset, centernet_dataset_collate
 
 
-# ---------------------------------------------------#
-#   获得类
-# ---------------------------------------------------#
 def get_classes(classes_path):
     '''loads the classes'''
     with open(classes_path) as f:
@@ -54,39 +48,19 @@ def fit_one_epoch(net, epoch, epoch_size, epoch_size_val, gen, genval, Epoch, cu
 
             optimizer.zero_grad()
 
-            if backbone == "resnet50":
-                ret = net(batch_images)
-                hm, wh, offset = ret['hm'],ret['sizes'],ret['offsets']
-                # print('hm_shape = {},batch_hms_shape = {}'.format(hm.shape,batch_hms.shape))
-                c_loss = focal_loss(hm, batch_hms)
-                wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
-                off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
+            ret = net(batch_images)
+            hm, wh, offset = ret['hm'], ret['sizes'], ret['offsets']
+            # print('hm_shape = {},batch_hms_shape = {}'.format(hm.shape,batch_hms.shape))
+            c_loss = focal_loss(hm, batch_hms)
+            wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
+            off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
 
-                loss = c_loss + wh_loss + off_loss
+            loss = c_loss + wh_loss + off_loss
 
-                total_loss += loss.item()
-                total_c_loss += c_loss.item()
-                total_r_loss += wh_loss.item() + off_loss.item()
-            else:
-                outputs = net(batch_images)
-                loss = 0
-                c_loss_all = 0
-                r_loss_all = 0
-                index = 0
-                for output in outputs:
-                    hm, wh, offset = output["hm"].sigmoid(), output["wh"], output["reg"]
-                    c_loss = focal_loss(hm, batch_hms)
-                    wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
-                    off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
+            total_loss += loss.item()
+            total_c_loss += c_loss.item()
+            total_r_loss += wh_loss.item() + off_loss.item()
 
-                    loss += c_loss + wh_loss + off_loss
-
-                    c_loss_all += c_loss
-                    r_loss_all += wh_loss + off_loss
-                    index += 1
-                total_loss += loss.item() / index
-                total_c_loss += c_loss_all.item() / index
-                total_r_loss += r_loss_all.item() / index
             loss.backward()
             optimizer.step()
 
@@ -114,27 +88,14 @@ def fit_one_epoch(net, epoch, epoch_size, epoch_size_val, gen, genval, Epoch, cu
 
                 batch_images, batch_hms, batch_whs, batch_regs, batch_reg_masks = batch
 
-                if backbone == "resnet50":
-                    ret = net(batch_images)
-                    hm, wh, offset = ret['hm'], ret['sizes'], ret['offsets']
+                ret = net(batch_images)
+                hm, wh, offset = ret['hm'], ret['sizes'], ret['offsets']
 
-                    c_loss = focal_loss(hm, batch_hms)
-                    wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
-                    off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
-                    loss = c_loss + wh_loss + off_loss
-                    val_loss += loss.item()
-                else:
-                    outputs = net(batch_images)
-                    index = 0
-                    loss = 0
-                    for output in outputs:
-                        hm, wh, offset = output["hm"].sigmoid(), output["wh"], output["reg"]
-                        c_loss = focal_loss(hm, batch_hms)
-                        wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
-                        off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
-                        loss += c_loss + wh_loss + off_loss
-                        index += 1
-                    val_loss += loss.item() / index
+                c_loss = focal_loss(hm, batch_hms)
+                wh_loss = 0.1 * l1_loss(wh, batch_whs, batch_reg_masks)
+                off_loss = l1_loss(offset, batch_regs, batch_reg_masks)
+                loss = c_loss + wh_loss + off_loss
+                val_loss += loss.item()
 
             pbar.set_postfix(**{'total_loss': val_loss / (iteration + 1)})
             pbar.update(1)
@@ -152,53 +113,18 @@ def fit_one_epoch(net, epoch, epoch_size, epoch_size_val, gen, genval, Epoch, cu
 
 
 if __name__ == "__main__":
-    # -------------------------------------------#
-    #   输入图片的大小
-    # -------------------------------------------#
     input_shape = (416, 416, 3)
     train_annotation_path = 'train_annotation.txt'
     valid_annotation_path = 'valid_annotation.txt'
-    # -------------------------------------------#
-    #   类对应的txt
-    # -------------------------------------------#
     classes_path = 'class_name.txt'
     class_names = get_classes(classes_path)
     print('class_names = {}'.format(class_names))
     num_classes = len(class_names)
-    # -------------------------------------------#
-    #   用于设定在使用resnet50作为主干网络时，
-    #   是否使用imagenet-resnet50的预训练权重。
-    #   仅在主干网络为resnet50时有作用。
-    #   默认为False
-    # -------------------------------------------#
-    pretrain = False
-    # -------------------------------------------#
-    #   主干特征提取网络的选择
-    #   resnet50和hourglass
-    # -------------------------------------------#
-    backbone = "resnet50"
+    pretrain = True
 
-    Cuda = False
+    Cuda = True
 
-    # assert backbone in ['resnet50', 'hourglass']
-    # if backbone == "resnet50":
-    #     model = CenterNet_Resnet50(num_classes, pretrain=pretrain)
-    # else:
-    #     model = CenterNet_HourglassNet({'hm': num_classes, 'wh': 2, 'reg': 2})
-    model = Centernet(num_classes)
-
-    # ------------------------------------------------------#
-    #   权值文件请看README，百度网盘下载
-    # ------------------------------------------------------#
-    # model_path = r"model_data/centernet_resnet50_voc.pth"
-    # # 加快模型训练的效率
-    # print('Loading weights into state dict...')
-    # model_dict = model.state_dict()
-    # pretrained_dict = torch.load(model_path)
-    # pretrained_dict = {k: v for k, v in pretrained_dict.items() if np.shape(model_dict[k]) == np.shape(v)}
-    # model_dict.update(pretrained_dict)
-    # model.load_state_dict(model_dict)
-    # print('Finished!')
+    model = Centernet(num_classes,pretrain)
 
     net = model.train()
 
@@ -207,17 +133,12 @@ if __name__ == "__main__":
         cudnn.benchmark = True
         net = net.cuda()
 
-    # 0.1用于验证，0.9用于训练
-    val_split = 0.1
     with open(train_annotation_path) as f:
         train_lines = f.readlines()
     with open(valid_annotation_path) as f:
         valid_lines = f.readlines()
-    # np.random.seed(10101)
-    # np.random.shuffle(lines)
-    # np.random.seed(None)
-    num_val = len(train_lines)
-    num_train = len(valid_lines)
+    num_train = len(train_lines)
+    num_val = len(valid_lines)
 
     # ------------------------------------------------------#
     #   主干特征提取网络特征通用，冻结训练可以加快训练速度
