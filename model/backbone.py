@@ -55,7 +55,6 @@ class BasicBlock(nn.Module):
 
         out += identity
         out = self.relu(out)
-
         return out
 
 

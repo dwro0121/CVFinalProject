@@ -1,5 +1,5 @@
 import torch.nn as nn
-from backbone import Resnet_Backbone
+from .backbone import Resnet_Backbone
 
 class Centernet(nn.Module):
 
@@ -92,4 +92,5 @@ class Singler_header(nn.Module):
         x = self.conv(x)
         x = self.relu(x)
         x = self.out(x)
+
         return x
