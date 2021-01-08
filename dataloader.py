@@ -1,15 +1,12 @@
-from random import shuffle
-import numpy as np
-import torch
-import torch.nn as nn
 import math
-import torch.nn.functional as F
-from PIL import Image
-from torch.autograd import Variable
-from torch.utils.data import DataLoader
-from torch.utils.data.dataset import Dataset
-from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+from random import shuffle
+
 import cv2
+import numpy as np
+from PIL import Image
+from torch.utils.data.dataset import Dataset
+import matplotlib.pyplot as plt
+
 
 def draw_gaussian(heatmap, center, radius, k=1):
     diameter = 2 * radius + 1
@@ -28,6 +25,7 @@ def draw_gaussian(heatmap, center, radius, k=1):
         np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
     return heatmap
 
+
 def gaussian2D(shape, sigma=1):
     m, n = [(ss - 1.) / 2. for ss in shape]
     y, x = np.ogrid[-m:m + 1, -n:n + 1]
@@ -35,6 +33,7 @@ def gaussian2D(shape, sigma=1):
     h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
     h[h < np.finfo(h.dtype).eps * h.max()] = 0
     return h
+
 
 def gaussian_radius(det_size, min_overlap=0.7):
     height, width = det_size
@@ -58,9 +57,10 @@ def gaussian_radius(det_size, min_overlap=0.7):
     r3 = (b3 + sq3) / 2
     return min(r1, r2, r3)
 
+
 def preprocess_image(image):
     mean = [0.22083542, 0.22083542, 0.22083542]
-    std = [0.33068898, 0.3250564,  0.32701415]
+    std = [0.33068898, 0.3250564, 0.32701415]
     return ((np.float32(image) / 255.) - mean) / std
 
 
@@ -79,7 +79,6 @@ class CenternetDataset(Dataset):
 
     def __len__(self):
         return len(self.train_lines)
-
 
     def get_random_data(self, annotation_line, input_shape, random=True, jitter=.3, hue=.1, sat=1.5, val=1.5,
                         proc_img=True):
@@ -106,26 +105,9 @@ class CenternetDataset(Dataset):
         dy = int(rand(0, h - nh))
         new_image = Image.new('RGB', (w, h), (128, 128, 128))
         new_image.paste(image, (dx, dy))
-        image = new_image
+        plt.show()
+        image_data = new_image
 
-        # flip image or not
-        flip = rand() < .5
-        if flip: image = image.transpose(Image.FLIP_LEFT_RIGHT)
-
-        # distort image
-        hue = rand(-hue, hue)
-        sat = rand(1, sat) if rand() < .5 else 1 / rand(1, sat)
-        val = rand(1, val) if rand() < .5 else 1 / rand(1, val)
-        x = cv2.cvtColor(np.array(image, np.float32) / 255, cv2.COLOR_RGB2HSV)
-        x[..., 0] += hue * 360
-        x[..., 0][x[..., 0] > 1] -= 1
-        x[..., 0][x[..., 0] < 0] += 1
-        x[..., 1] *= sat
-        x[..., 2] *= val
-        x[x[:, :, 0] > 360, 0] = 360
-        x[:, :, 1:][x[:, :, 1:] > 1] = 1
-        x[x < 0] = 0
-        image_data = cv2.cvtColor(x, cv2.COLOR_HSV2RGB) * 255
 
         # correct boxes
         box_data = np.zeros((len(box), 5))
@@ -133,7 +115,6 @@ class CenternetDataset(Dataset):
             np.random.shuffle(box)
             box[:, [0, 2]] = box[:, [0, 2]] * nw / iw + dx
             box[:, [1, 3]] = box[:, [1, 3]] * nh / ih + dy
-            if flip: box[:, [0, 2]] = w - box[:, [2, 0]]
             box[:, 0:2][box[:, 0:2] < 0] = 0
             box[:, 2][box[:, 2] > w] = w
             box[:, 3][box[:, 3] > h] = h
@@ -212,24 +193,3 @@ def centernet_dataset_collate(batch):
     batch_regs = np.array(batch_regs)
     batch_reg_masks = np.array(batch_reg_masks)
     return imgs, batch_hms, batch_whs, batch_regs, batch_reg_masks
-# if __name__ == "__main__":
-#     input_shape = (416,416,3)
-#     annotation_path = 'train_annotation.txt'
-#     with open(annotation_path) as f:
-#         lines = f.readlines()
-#     train_dataset = CenternetDataset(lines, input_shape, 5)
-#     gen = DataLoader(train_dataset, batch_size=8, num_workers=8, pin_memory=True,
-#                                     drop_last=True, collate_fn=centernet_dataset_collate)
-#     epoch_size = 10
-#     for iteration, batch in enumerate(gen):
-#         if iteration >= epoch_size:
-#             break
-#
-#         with torch.no_grad():
-#             batch = [Variable(torch.from_numpy(ann).type(torch.FloatTensor)) for ann in batch]
-#
-#         batch_images, batch_hms, batch_whs, batch_regs, batch_reg_masks = batch
-#         part_name = ['batch_images', 'batch_hms', 'batch_whs', 'batch_regs', 'batch_reg_masks']
-#         for part,name in zip(batch,part_name):
-#             print('{}_shape = {}'.format(name, part.shape))
-#             # print('{} = {}'.format(name,part))

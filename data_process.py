@@ -1,12 +1,14 @@
 import os
-import random
 import xml.etree.ElementTree as ET
-import cv2
-from PIL import Image
+
 import numpy as np
+from PIL import Image
+
 dataBasePath = 'data/Vehicles-OpenImages.v1-416x416.voc/'
 saveBasePath = 'data/'
 set_list = ['train', 'test', 'valid']
+
+
 def process_one():
     ftrainval = open(os.path.join(saveBasePath, 'trainval.txt'), 'w')
     ftest = open(os.path.join(saveBasePath, 'test.txt'), 'w')
@@ -34,6 +36,7 @@ def process_one():
     fval.close()
     ftest.close()
 
+
 # process_one()
 
 def get_classes():
@@ -56,6 +59,7 @@ def get_classes():
         classes_file.write(str(classes))
     return classes
 
+
 def convert_annotation(image_id, list_file, image_set):
     in_file = open('{}{}/{}.xml'.format(dataBasePath, image_set, image_id), encoding='utf-8')
     tree = ET.parse(in_file)
@@ -71,6 +75,7 @@ def convert_annotation(image_id, list_file, image_set):
              int(xmlbox.find('ymax').text))
         list_file.write(" " + ",".join([str(a) for a in b]) + ',' + str(cls_id))
 
+
 def process_two():
     classes = get_classes()
 
@@ -82,6 +87,7 @@ def process_two():
             convert_annotation(image_id, list_file, image_set)
             list_file.write('\n')
         list_file.close()
+
 
 def get_mean_and_std():
     image_set = 'train'

@@ -1,14 +1,15 @@
 import torch
 import torch.nn.functional as F
 
+
 def gaussian_kernel(Y):
     '''
 
     :return:
     '''
 
-def focal_loss(output, label, alpha=2, beta=4):
 
+def focal_loss(output, label, alpha=2, beta=4):
     # label = gaussian_kernel(label)
     output = output.permute(0, 2, 3, 1)
     pos_inds = label.eq(1).float()
@@ -28,6 +29,7 @@ def focal_loss(output, label, alpha=2, beta=4):
     else:
         loss = -(pos_loss + neg_loss) / num_pos
     return loss
+
 
 def l1_loss(output, label, mask):
     '''
