@@ -1,8 +1,10 @@
 import math
-from random import shuffle
+from random import *
 
+import imgaug.augmenters as iaa
 import numpy as np
 from PIL import Image
+from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 from torch.utils.data.dataset import Dataset
 
 
@@ -56,6 +58,32 @@ def gaussian_radius(det_size, min_overlap=0.7):
     return min(r1, r2, r3)
 
 
+def augmentor(img, box, img_size):
+    img = np.array(img)
+    box_list = []
+    for data in box:
+        box_list.append(BoundingBox(data[0], data[1], data[2], data[3]))
+    bbs = BoundingBoxesOnImage(box_list, shape=img.shape)
+    seq = iaa.Sequential([
+        iaa.LinearContrast((0.9, 1.1), seed=randint(0, 1000)),
+        iaa.Multiply((0.75, 1.25), seed=randint(0, 1000)),
+        iaa.Fliplr(0.5, seed=randint(0, 1000)),
+        iaa.Crop(percent=(0, 0.3), seed=randint(0, 1000))],
+        seed=randint(0, 1000)
+    )
+    img_aug, bbs_aug = seq(image=img, bounding_boxes=bbs)
+    for i in range(len(bbs_aug.bounding_boxes)):
+        after = bbs_aug.bounding_boxes[i]
+        box[i, :4] = [after.x1, after.y1, after.x2, after.y2]
+    box[:, [0, 2]] = np.clip(box[:, [0, 2]], 0, img_size[1] - 1)
+    box[:, [1, 3]] = np.clip(box[:, [1, 3]], 0, img_size[0] - 1)
+    list_del = []
+    for i in range(len(box)):
+        if math.isclose(box[i, 0], box[i, 2]) or math.isclose(box[i, 1], box[i, 3]):
+            list_del.append(i)
+    return img, box
+
+
 def preprocess_image(image):
     mean = [0.22083542, 0.22083542, 0.22083542]
     std = [0.33068898, 0.3250564, 0.32701415]
@@ -63,13 +91,14 @@ def preprocess_image(image):
 
 
 class Dataset(Dataset):
-    def __init__(self, train_lines, input_size, num_classes):
+    def __init__(self, train_lines, input_size, num_classes, augment=True):
         super(Dataset, self).__init__()
 
         self.train_lines = train_lines
         self.input_size = input_size
         self.output_size = (int(input_size[0] / 4), int(input_size[1] / 4))
         self.num_classes = num_classes
+        self.augment = augment
 
     def __len__(self):
         return len(self.train_lines)
@@ -79,7 +108,9 @@ class Dataset(Dataset):
             shuffle(self.train_lines)
         line = self.train_lines[index].split()
         img = Image.open(line[0])
-        y = np.array([np.array(list(map(int, box.split(',')))) for box in line[1:]])
+        box = np.array([np.array(list(map(float, box.split(',')))) for box in line[1:]])
+        if self.augment:
+            img, box = augmentor(img, box, self.input_size)
 
         batch_hm = np.zeros((self.output_size[0], self.output_size[1], self.num_classes),
                             dtype=np.float32)
@@ -87,19 +118,19 @@ class Dataset(Dataset):
         batch_reg = np.zeros((self.output_size[0], self.output_size[1], 2), dtype=np.float32)
         batch_reg_mask = np.zeros((self.output_size[0], self.output_size[1]), dtype=np.float32)
 
-        if len(y) != 0:
-            boxes = np.array(y[:, :4], dtype=np.float32)
+        if len(box) != 0:
+            boxes = np.array(box[:, :4], dtype=np.float32)
             boxes[:, 0] = boxes[:, 0] / self.input_size[1] * self.output_size[1]
             boxes[:, 1] = boxes[:, 1] / self.input_size[0] * self.output_size[0]
             boxes[:, 2] = boxes[:, 2] / self.input_size[1] * self.output_size[1]
             boxes[:, 3] = boxes[:, 3] / self.input_size[0] * self.output_size[0]
 
-        for i in range(len(y)):
+        for i in range(len(box)):
             bbox = boxes[i].copy()
             bbox = np.array(bbox)
             bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.output_size[1] - 1)
             bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.output_size[0] - 1)
-            cls_id = int(y[i, -1])
+            cls_id = int(box[i, -1])
 
             h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
             if h > 0 and w > 0:
@@ -119,7 +150,6 @@ class Dataset(Dataset):
         return img, batch_hm, batch_wh, batch_reg, batch_reg_mask
 
 
-# DataLoader中collate_fn使用
 def collate(batch):
     imgs, batch_hms, batch_whs, batch_regs, batch_reg_masks = [], [], [], [], []
 
