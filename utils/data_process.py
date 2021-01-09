@@ -55,7 +55,7 @@ def get_classes():
                 if cls not in classes:
                     classes.append(cls)
     print('classes = {}'.format(classes))
-    with open('class_name.txt', 'w') as classes_file:
+    with open('../class_name.txt', 'w') as classes_file:
         classes_file.write(str(classes))
     return classes
 
