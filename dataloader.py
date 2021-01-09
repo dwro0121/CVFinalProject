@@ -1,11 +1,9 @@
 import math
 from random import shuffle
 
-import cv2
 import numpy as np
 from PIL import Image
 from torch.utils.data.dataset import Dataset
-import matplotlib.pyplot as plt
 
 
 def draw_gaussian(heatmap, center, radius, k=1):
@@ -64,13 +62,9 @@ def preprocess_image(image):
     return ((np.float32(image) / 255.) - mean) / std
 
 
-def rand(a=0, b=1):
-    return np.random.rand() * (b - a) + a
-
-
-class CenternetDataset(Dataset):
+class Dataset(Dataset):
     def __init__(self, train_lines, input_size, num_classes):
-        super(CenternetDataset, self).__init__()
+        super(Dataset, self).__init__()
 
         self.train_lines = train_lines
         self.input_size = input_size
@@ -80,63 +74,12 @@ class CenternetDataset(Dataset):
     def __len__(self):
         return len(self.train_lines)
 
-    def get_random_data(self, annotation_line, input_shape, random=True, jitter=.3, hue=.1, sat=1.5, val=1.5,
-                        proc_img=True):
-        '''r实时数据增强的随机预处理'''
-        line = annotation_line.split()
-        image = Image.open(line[0])
-        iw, ih = image.size
-        h, w = input_shape
-        box = np.array([np.array(list(map(int, box.split(',')))) for box in line[1:]])
-
-        # resize image
-        new_ar = w / h * rand(1 - jitter, 1 + jitter) / rand(1 - jitter, 1 + jitter)
-        scale = rand(0.25, 2)
-        if new_ar < 1:
-            nh = int(scale * h)
-            nw = int(nh * new_ar)
-        else:
-            nw = int(scale * w)
-            nh = int(nw / new_ar)
-        image = image.resize((nw, nh), Image.BICUBIC)
-
-        # place image
-        dx = int(rand(0, w - nw))
-        dy = int(rand(0, h - nh))
-        new_image = Image.new('RGB', (w, h), (128, 128, 128))
-        new_image.paste(image, (dx, dy))
-        plt.show()
-        image_data = new_image
-
-
-        # correct boxes
-        box_data = np.zeros((len(box), 5))
-        if len(box) > 0:
-            np.random.shuffle(box)
-            box[:, [0, 2]] = box[:, [0, 2]] * nw / iw + dx
-            box[:, [1, 3]] = box[:, [1, 3]] * nh / ih + dy
-            box[:, 0:2][box[:, 0:2] < 0] = 0
-            box[:, 2][box[:, 2] > w] = w
-            box[:, 3][box[:, 3] > h] = h
-            box_w = box[:, 2] - box[:, 0]
-            box_h = box[:, 3] - box[:, 1]
-            box = box[np.logical_and(box_w > 1, box_h > 1)]  # discard invalid box
-            box_data = np.zeros((len(box), 5))
-            box_data[:len(box)] = box
-        if len(box) == 0:
-            return image_data, []
-
-        if (box_data[:, :4] > 0).any():
-            return image_data, box_data
-        else:
-            return image_data, []
-
     def __getitem__(self, index):
         if index == 0:
             shuffle(self.train_lines)
-        lines = self.train_lines
-
-        img, y = self.get_random_data(lines[index], [self.input_size[0], self.input_size[1]])
+        line = self.train_lines[index].split()
+        img = Image.open(line[0])
+        y = np.array([np.array(list(map(int, box.split(',')))) for box in line[1:]])
 
         batch_hm = np.zeros((self.output_size[0], self.output_size[1], self.num_classes),
                             dtype=np.float32)
@@ -177,7 +120,7 @@ class CenternetDataset(Dataset):
 
 
 # DataLoader中collate_fn使用
-def centernet_dataset_collate(batch):
+def collate(batch):
     imgs, batch_hms, batch_whs, batch_regs, batch_reg_masks = [], [], [], [], []
 
     for img, batch_hm, batch_wh, batch_reg, batch_reg_mask in batch:

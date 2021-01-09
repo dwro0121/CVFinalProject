@@ -57,7 +57,6 @@ def train_one_epoch(net, epoch, epoch_size, train_loader, Epoch_Num, cuda, optim
 def val_one_epoch(net, epoch, epoch_size, val_loader, Epoch_Num, cuda):
     net.eval()
     val_loss = 0
-    print('Start Validation')
     with tqdm(total=epoch_size, desc=f'Epoch {epoch + 1}/{Epoch_Num}', postfix=dict, mininterval=0.3) as pbar:
         for iteration, batch in enumerate(val_loader):
             if iteration >= epoch_size:

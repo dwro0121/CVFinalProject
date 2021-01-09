@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from dataloader import CenternetDataset, centernet_dataset_collate
+from dataloader import Dataset, collate
 from model.centernet import Centernet
 from utils.tool import val_one_epoch, train_one_epoch
 
@@ -49,12 +49,12 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
 
-    train_dataset = CenternetDataset(train_lines, input_shape, num_classes)
-    val_dataset = CenternetDataset(valid_lines, input_shape, num_classes)
+    train_dataset = Dataset(train_lines, input_shape, num_classes)
+    val_dataset = Dataset(valid_lines, input_shape, num_classes)
     train_loader = DataLoader(train_dataset, batch_size=Batch_size, num_workers=8, pin_memory=True,
-                              drop_last=True, collate_fn=centernet_dataset_collate)
+                              drop_last=True, collate_fn=collate)
     val_loader = DataLoader(val_dataset, batch_size=Batch_size, num_workers=8, pin_memory=True,
-                            drop_last=True, collate_fn=centernet_dataset_collate)
+                            drop_last=True, collate_fn=collate)
 
     epoch_size = num_train // Batch_size
     epoch_size_val = num_val // Batch_size
@@ -69,6 +69,7 @@ if __name__ == "__main__":
             model.unfreeze()
 
         train_loss = train_one_epoch(model, epoch, epoch_size, train_loader, Epoch_Num, Cuda, optimizer)
+        print('Start Validation')
         val_loss = val_one_epoch(model, epoch, epoch_size_val, val_loader, Epoch_Num, Cuda)
         print('Finish Validation')
         print('Epoch:' + str(epoch + 1) + '/' + str(Epoch_Num))
