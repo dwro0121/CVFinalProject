@@ -6,6 +6,15 @@ from torch.autograd import Variable
 from tqdm import tqdm
 
 from utils.losses import focal_loss, l1_loss
+import matplotlib.pyplot as plt
+from PIL import Image
+
+
+def get_classes(classes_path):
+    '''loads the classes'''
+    with open(classes_path) as f:
+        class_names = eval(f.readlines()[0])
+    return class_names
 
 
 def get_lr(optimizer):
@@ -82,6 +91,29 @@ def val_one_epoch(net, epoch, epoch_size, val_loader, Epoch_Num, cuda):
             pbar.set_postfix(**{'total_loss': val_loss / (iteration + 1)})
             pbar.update(1)
     return val_loss / (epoch_size + 1)
+
+
+def detect_image(net, test_loader, cuda):
+    net.eval
+    with tqdm(postfix=dict, mininterval=0.3) as pbar:
+        for iteration, data in enumerate(test_loader):
+            with torch.no_grad():
+                if cuda:
+                    img = Variable(data[0].type(torch.FloatTensor)).cuda()
+                else:
+                    img = Variable(data[0].type(torch.FloatTensor))
+
+
+                ret = net(img)
+                hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
+                process(hm,wh,offset)
+        return 1
+
+def process(hm, wh, offset):
+    peaks_max = 100
+
+    print(hm)
+
 
 
 def draw_gaussian(heatmap, center, radius, k=1):

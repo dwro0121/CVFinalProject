@@ -5,17 +5,9 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from utils.dataloader import Dataset, collate
 from model.centernet import Centernet
-from utils.tool import val_one_epoch, train_one_epoch
-
-
-def get_classes(classes_path):
-    '''loads the classes'''
-    with open(classes_path) as f:
-        class_names = eval(f.readlines()[0])
-    return class_names
-
+from utils.dataloader import Dataset, collate
+from utils.tool import val_one_epoch, train_one_epoch, get_classes
 
 if __name__ == "__main__":
     input_shape = (416, 416, 3)
@@ -27,8 +19,8 @@ if __name__ == "__main__":
     num_classes = len(class_names)
     pretrain = True
     Cuda = True
-
-    model = Centernet(num_classes, 'resnet50',pretrain)
+    backbone = 'resnet50'
+    model = Centernet(num_classes, backbone, pretrain)
 
     if Cuda:
         model = model.cuda()
@@ -49,8 +41,8 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
 
-    train_dataset = Dataset(train_lines, input_shape, num_classes)
-    val_dataset = Dataset(valid_lines, input_shape, num_classes)
+    train_dataset = Dataset(train_lines, input_shape, num_classes, augment=True)
+    val_dataset = Dataset(valid_lines, input_shape, num_classes, augment=False)
     train_loader = DataLoader(train_dataset, batch_size=Batch_size, num_workers=8, pin_memory=True,
                               drop_last=True, collate_fn=collate)
     val_loader = DataLoader(val_dataset, batch_size=Batch_size, num_workers=8, pin_memory=True,
@@ -62,7 +54,7 @@ if __name__ == "__main__":
     model.freeze()
 
     for epoch in range(Init_Epoch, Epoch_Num):
-        if epoch is Freeze_Epoch+1:
+        if epoch is Freeze_Epoch + 1:
             lr = 1e-3
             optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
             lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
@@ -79,6 +71,6 @@ if __name__ == "__main__":
         print('Saving state, iter:', str(epoch + 1))
         if not Path('logs').exists():
             os.mkdir('logs')
-        torch.save(model.state_dict(), 'logs/Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth' % (
+        torch.save(model.state_dict(), 'logs/'+backbone+'Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth' % (
             (epoch + 1), train_loss, val_loss))
         lr_scheduler.step(val_loss)
