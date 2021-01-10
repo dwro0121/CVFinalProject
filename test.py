@@ -14,9 +14,9 @@ if __name__ == "__main__":
 
     Cuda = True
 
-
+    model_path = '.\logs\Epoch97-Total_Loss5.4814-Val_Loss5.9695.pth'
     model = Centernet(num_classes, 'resnet18', pretrain=False)
-    model.load_state_dict(torch.load('.\logs\Epoch97-Total_Loss5.4814-Val_Loss5.9695.pth'))
+    model.load_state_dict(torch.load(model_path))
 
     if Cuda:
         model = model.cuda()
