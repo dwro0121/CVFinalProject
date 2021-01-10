@@ -2,13 +2,18 @@ import time
 
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import tqdm
+import imgaug as ia
+import imgaug.augmenters as iaa
+import numpy as np
+from PIL import Image
+from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 
 from utils.losses import focal_loss, l1_loss
-import matplotlib.pyplot as plt
-from PIL import Image
 
+list_color = [(255,0,0), (0,255,0), (0,0,255), (0,0,0), (217,65,197)]
 
 def get_classes(classes_path):
     '''loads the classes'''
@@ -95,6 +100,7 @@ def val_one_epoch(net, epoch, epoch_size, val_loader, Epoch_Num, cuda):
 
 def detect_image(net, test_loader, cuda):
     net.eval
+    print(len(test_loader))
     with tqdm(postfix=dict, mininterval=0.3) as pbar:
         for iteration, data in enumerate(test_loader):
             with torch.no_grad():
@@ -103,17 +109,57 @@ def detect_image(net, test_loader, cuda):
                 else:
                     img = Variable(data[0].type(torch.FloatTensor))
 
-
                 ret = net(img)
                 hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
-                process(hm,wh,offset)
-        return 1
+                bboxes = process(hm, wh, offset, cuda)
+                img = np.array(img.cpu().detach()).squeeze(0)
+                c, n = np.shape(bboxes)[0],np.shape(bboxes)[1]
+                img = np.transpose(img,(1,2,0))
+                for i in range(c):
+                    list2 = []
+                    for j in range(n):
+                        list2.append(BoundingBox(int(bboxes[i,j,1]),int(bboxes[i,j,2]),int(bboxes[i,j,3]),int(bboxes[i,j,4])))
+                    bbs = BoundingBoxesOnImage(list2, shape=np.shape(img))
+                    print(list_color[i])
+                    img = bbs.draw_on_image(img, color=list_color[i],size=2)
+                import matplotlib.pyplot as plt
 
-def process(hm, wh, offset):
-    peaks_max = 100
+                plt.imshow(img)
+                plt.show()
 
-    print(hm)
 
+def process(hm, wh, offset, cuda, peaks_num=20):
+    if cuda:
+        hmax = nn.functional.max_pool2d(hm, (3, 3), stride=1, padding=1).cuda()
+    else:
+        hmax = nn.functional.max_pool2d(hm, (3, 3), stride=1, padding=1)
+    keep = (hmax == hm).float()
+    keep[:, :, 0, :] = 0
+    keep[:, :, :, 0] = 0
+    keep[:, :, -1, :] = 0
+    keep[:, :, :, -1] = 0
+    hm = hm * keep
+    b, c, h, w = hm.shape
+
+    wh = wh.squeeze(0).permute(1, 2, 0).view(-1, 2)
+    offset = offset.squeeze(0).permute(1, 2, 0).view(-1, 2)
+    mesh_w, mesh_h = torch.meshgrid(torch.arange(h), torch.arange(w))
+    if cuda:
+        mesh_w, mesh_h = torch.flatten(mesh_w).float().cuda(), torch.flatten(mesh_h).float().cuda()
+    else:
+        mesh_w, mesh_h = torch.flatten(mesh_w).float(), torch.flatten(mesh_h).float()
+    topk_hm, topk_id = torch.topk(hm[:].view(c, -1), peaks_num, dim=1)
+    mesh_w = mesh_w + offset[:, 0]
+    mesh_h = mesh_h + offset[:, 1]
+    half_w = wh[:, 0] / 2
+    half_h = wh[:, 1] / 2
+    bboxes = np.array([[[topk_hm[i, j].item(),
+                (mesh_w - half_w)[topk_id[i,j]].item()*4,
+                (mesh_h - half_h)[topk_id[i,j]].item()*4,
+                (mesh_w + half_w)[topk_id[i,j]].item()*4,
+                (mesh_h + half_w)[topk_id[i,j]].item()*4]
+               for j in range(peaks_num)] for i in range(c)])
+    return bboxes
 
 
 def draw_gaussian(heatmap, center, radius, k=1):
