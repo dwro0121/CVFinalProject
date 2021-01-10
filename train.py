@@ -28,7 +28,7 @@ if __name__ == "__main__":
     pretrain = True
     Cuda = True
 
-    model = Centernet(num_classes, pretrain)
+    model = Centernet(num_classes, 'resnet50',pretrain)
 
     if Cuda:
         model = model.cuda()
@@ -62,11 +62,12 @@ if __name__ == "__main__":
     model.freeze()
 
     for epoch in range(Init_Epoch, Epoch_Num):
-        if epoch is Freeze_Epoch:
+        if epoch is Freeze_Epoch+1:
             lr = 1e-3
             optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
             lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
             model.unfreeze()
+            print("Unfreeze Model")
 
         train_loss = train_one_epoch(model, epoch, epoch_size, train_loader, Epoch_Num, Cuda, optimizer)
         print('Start Validation')
