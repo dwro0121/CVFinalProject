@@ -1,105 +1,102 @@
+import glob
 import os
 import xml.etree.ElementTree as ET
+from os import getcwd
 
-import numpy as np
+import imgaug.augmenters as iaa
 from PIL import Image
+from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
+from sklearn.model_selection import train_test_split
+import numpy as np
 
-dataBasePath = 'data/Vehicles-OpenImages.v1-416x416.voc/'
-saveBasePath = 'data/'
-set_list = ['train', 'test', 'valid']
-
-
-def process_one():
-    ftrainval = open(os.path.join(saveBasePath, 'trainval.txt'), 'w')
-    ftest = open(os.path.join(saveBasePath, 'test.txt'), 'w')
-    ftrain = open(os.path.join(saveBasePath, 'train.txt'), 'w')
-    fval = open(os.path.join(saveBasePath, 'valid.txt'), 'w')
-    handle_list = [ftrain, ftest, fval]
-    for set_name, fhandle in zip(set_list, handle_list):
-        xmlfilepath = dataBasePath + set_name
-        temp_xml = os.listdir(xmlfilepath)
-        total_xml = []
-        for xml in temp_xml:
-            if xml.endswith(".xml"):
-                total_xml.append(xml)
-
-        print('{}_num = {}'.format(set_name, len(total_xml)))
-        for i in range(len(total_xml)):
-            name = total_xml[i][:-4] + '\n'
-            fhandle.write(name)
-            # print('name = {}'.format(name))
-            if set_name == 'train' or set_name == 'valid':
-                ftrainval.write(name)
-
-    ftrainval.close()
-    ftrain.close()
-    fval.close()
-    ftest.close()
+dirs = ['../data/VOC2007/JPEGImages/']
+classes = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog",
+           "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
 
-# process_one()
+def getImagesInDir(dir_path):
+    image_list = []
+    for filename in glob.glob(dir_path + '/*.png'):
+        image_list.append([filename])
+    for filename in glob.glob(dir_path + '/*.jpg'):
+        image_list.append([filename])
 
-def get_classes():
-    classes = []
-    for image_set in set_list:
-        image_ids = open('{}{}.txt'.format(saveBasePath, image_set)).read().strip().split()
-
-        for image_id in image_ids:
-            in_file = open('{}{}/{}.xml'.format(dataBasePath, image_set, image_id), encoding='utf-8')
-            tree = ET.parse(in_file)
-            root = tree.getroot()
-
-            for obj in root.iter('object'):
-
-                cls = obj.find('name').text
-                if cls not in classes:
-                    classes.append(cls)
-    print('classes = {}'.format(classes))
-    with open('../class_name.txt', 'w') as classes_file:
-        classes_file.write(str(classes))
-    return classes
+    return image_list
 
 
-def convert_annotation(image_id, list_file, image_set):
-    in_file = open('{}{}/{}.xml'.format(dataBasePath, image_set, image_id), encoding='utf-8')
+def convert_annotation(file, dir_path, output_path, image_path):
+    basename = os.path.basename(image_path)
+    basename_no_ext = os.path.splitext(basename)[0]
+
+    in_file = open(dir_path + '/' + basename_no_ext + '.xml', encoding='UTF8')
     tree = ET.parse(in_file)
     root = tree.getroot()
-
+    size = root.find('size')
+    img = Image.open(image_path)
+    img = np.array(img)
+    w = int(size.find('width').text)
+    h = int(size.find('height').text)
+    list1 = []
+    list2 = []
     for obj in root.iter('object'):
+        difficult = obj.find('difficult').text
         cls = obj.find('name').text
-        if cls not in classes:
+        if cls not in classes or int(difficult) == 1:
             continue
         cls_id = classes.index(cls)
         xmlbox = obj.find('bndbox')
-        b = (int(xmlbox.find('xmin').text), int(xmlbox.find('ymin').text), int(xmlbox.find('xmax').text),
-             int(xmlbox.find('ymax').text))
-        list_file.write(" " + ",".join([str(a) for a in b]) + ',' + str(cls_id))
+        b = (xmlbox.find('xmin').text, xmlbox.find('xmax').text, xmlbox.find('ymin').text,
+             xmlbox.find('ymax').text)
+        list2.append(BoundingBox(int(b[0]), int(b[2]), int(b[1]), int(b[3])))
+        list1.append(str(cls_id))
+        # file.write(",".join([str(a) for a in b]) + ',' + str(cls_id) + ' ')
+    bbs = BoundingBoxesOnImage(list2, shape=img.shape)
+    seq = iaa.Sequential([iaa.Resize((416, 416))], )
+    image_aug, bbs_aug = seq(image=img, bounding_boxes=bbs)
+
+    # image_after = bbs_aug.draw_on_image(image_aug, size=1, color=[0, 0, 255])
+    # import matplotlib.pyplot as plt
+    # plt.imshow(image_after)
+    # plt.show()
+    img = Image.fromarray(image_aug)
+    img.save(output_path+basename_no_ext+'.jpg')
+    for i in range(len(bbs_aug.bounding_boxes)):
+        box = bbs_aug.bounding_boxes[i]
+        obj = [box.x1,box.y1,box.x2,box.y2]
+        file.write(",".join([str(int(a)) for a in obj]) + ',' + list1[i] + ' ')
 
 
-def process_two():
-    classes = get_classes()
+cwd = getcwd()
 
-    for image_set in set_list:
-        image_ids = open('{}{}.txt'.format(saveBasePath, image_set)).read().strip().split()
-        list_file = open('{}_annotation.txt'.format(image_set), 'w')
-        for image_id in image_ids:
-            list_file.write('{}{}/{}.jpg'.format(dataBasePath, image_set, image_id))
-            convert_annotation(image_id, list_file, image_set)
-            list_file.write('\n')
-        list_file.close()
+for dir_path in dirs:
+    output_path = 'D:/Files/GIT/CVFinalProject/data/VOC/'
+    train_path = output_path+'train/'
 
+    val_path = output_path+'valid/'
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
-def get_mean_and_std():
-    image_set = 'train'
-    image_ids = open('{}{}.txt'.format(saveBasePath, image_set)).read().strip().split()
-    all_image = []
-    for image_id in image_ids:
-        image = Image.open('{}{}/{}.jpg'.format(dataBasePath, image_set, image_id))
-        all_image.append((np.array(image, dtype=np.float32) / 255.))
-    all_image = np.array(all_image)
-    # print('all_image_shape = {}'.format(np.shape(all_image)))
-    channel = np.shape(all_image)[-1]
-    all_image = np.reshape(all_image, [-1, channel])
+    if not os.path.exists(train_path):
+        os.makedirs(train_path)
+    if not os.path.exists(val_path):
+        os.makedirs(val_path)
 
-    print('mean = {}'.format(np.mean(all_image, axis=0)))
-    print('std = {}'.format(np.std(all_image, axis=0)))
+    image_paths = getImagesInDir(dir_path)
+    print(dir_path)
+    list_train, list_val = train_test_split(image_paths, test_size=0.25, random_state=3030, shuffle=True)
+    file_train = open(dir_path.replace('VOC2007/JPEGImages/', '') + 'train_annotation.txt', 'w')
+    file_val = open(dir_path.replace('VOC2007/JPEGImages/', '') + 'valid_annotation.txt', 'w')
+
+    for image_path in list_train:
+        file_train.write(image_path[0].replace('../data/VOC2007/JPEGImages', 'data/VOC/train/').replace('\\', '') + ' ')
+        convert_annotation(file_train, dir_path, train_path, image_path[0])
+        file_train.write('\n')
+    file_train.close()
+    for image_path in list_val:
+        file_val.write(image_path[0].replace('../data/VOC2007/JPEGImages', 'data/VOC/valid/').replace('\\', '') + ' ')
+        convert_annotation(file_val, dir_path, val_path, image_path[0])
+        file_val.write('\n')
+
+    file_val.close()
+
+    print("Finished processing")

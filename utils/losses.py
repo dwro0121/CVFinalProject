@@ -20,7 +20,7 @@ def focal_loss(output, label, alpha=2, beta=4):
     pos_loss = pos_inds * torch.log(output) * torch.pow(1 - output, alpha)
     neg_loss = neg_inds * torch.log(1 - output) * torch.pow(output, alpha) * torch.pow(1 - label, beta)
 
-    num_pos = pos_inds.sum()
+    num_pos = pos_inds.float().sum()
     pos_loss = pos_loss.sum()
     neg_loss = neg_loss.sum()
 

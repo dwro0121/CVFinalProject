@@ -17,7 +17,7 @@ def augmentor(img, box, img_size):
         box_list.append(BoundingBox(data[0], data[1], data[2], data[3]))
     bbs = BoundingBoxesOnImage(box_list, shape=img.shape)
     seq = iaa.Sequential([
-        iaa.LinearContrast((0.9, 1.1), seed=randint(0, 1000)),
+        iaa.LinearContrast((0.75, 1.25), seed=randint(0, 1000)),
         iaa.Multiply((0.75, 1.25), seed=randint(0, 1000)),
         iaa.Fliplr(0.5, seed=randint(0, 1000)),
         iaa.Crop(percent=(0, 0.3), seed=randint(0, 1000))],

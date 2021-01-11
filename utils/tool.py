@@ -62,6 +62,9 @@ def train_one_epoch(net, epoch, epoch_size, train_loader, Epoch_Num, cuda, optim
             waste_time = time.time() - start_time
 
             pbar.set_postfix(**{'total_loss': total_loss / (iteration + 1),
+                                'c_loss': c_loss.item(),
+                                'wh_loss': 0.1*wh_loss.item(),
+                                'off_loss': off_loss.item(),
                                 'lr': get_lr(optimizer),
                                 's/step': waste_time})
             pbar.update(1)
@@ -111,7 +114,7 @@ def detect_image(net, test_loader, cuda):
 
                 ret = net(img)
                 hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
-                bboxes = process(hm, wh, offset, cuda)
+                bboxes = process(hm, wh, offset,0.1, cuda)
                 img = np.array(img.cpu().detach()).squeeze(0)
                 c, n = np.shape(bboxes)[0],np.shape(bboxes)[1]
                 img = np.transpose(img,(1,2,0))
@@ -120,7 +123,6 @@ def detect_image(net, test_loader, cuda):
                     for j in range(n):
                         list2.append(BoundingBox(int(bboxes[i,j,1]),int(bboxes[i,j,2]),int(bboxes[i,j,3]),int(bboxes[i,j,4])))
                     bbs = BoundingBoxesOnImage(list2, shape=np.shape(img))
-                    print(list_color[i])
                     img = bbs.draw_on_image(img, color=list_color[i],size=2)
                 import matplotlib.pyplot as plt
 
@@ -128,7 +130,7 @@ def detect_image(net, test_loader, cuda):
                 plt.show()
 
 
-def process(hm, wh, offset, cuda, peaks_num=20):
+def process(hm, wh, offset,threshold=0.3, cuda=None, peaks_num=20):
     if cuda:
         hmax = nn.functional.max_pool2d(hm, (3, 3), stride=1, padding=1).cuda()
     else:
@@ -138,7 +140,8 @@ def process(hm, wh, offset, cuda, peaks_num=20):
     keep[:, :, :, 0] = 0
     keep[:, :, -1, :] = 0
     keep[:, :, :, -1] = 0
-    hm = hm * keep
+    mask = (hm > threshold).float()
+    hm = hm * keep * mask
     b, c, h, w = hm.shape
 
     wh = wh.squeeze(0).permute(1, 2, 0).view(-1, 2)

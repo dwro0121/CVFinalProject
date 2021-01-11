@@ -66,13 +66,14 @@ class Centernet_decoder(nn.Module):
 
 
 class Centernet_header(nn.Module):
-    def __init__(self, num_classes=80):
+    def __init__(self, num_classes=80, bn_momentum=0.1):
         super(Centernet_header, self).__init__()
         self.num_classes = num_classes
+        self.bn_momentum =bn_momentum
         self.sigmoid = nn.Sigmoid()
-        self.hm_header = Singler_header(64, self.num_classes)
-        self.offsets_header = Singler_header(64, 2)
-        self.wh_header = Singler_header(64, 2)
+        self.hm_header = Singler_header(64, self.num_classes, self.bn_momentum)
+        self.offsets_header = Singler_header(64, 2, self.bn_momentum)
+        self.wh_header = Singler_header(64, 2, self.bn_momentum)
 
     def forward(self, x):
         hm = self.hm_header(x)
@@ -88,9 +89,10 @@ class Centernet_header(nn.Module):
 
 
 class Singler_header(nn.Module):
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channel, out_channel, bn_momentum):
         super(Singler_header, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1)
+        self.bn = nn.BatchNorm2d(in_channel, momentum=bn_momentum)
         self.relu = nn.ReLU(inplace=True)
         self.out = nn.Conv2d(in_channels=in_channel, out_channels=out_channel, kernel_size=1)
 

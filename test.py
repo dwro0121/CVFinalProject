@@ -6,7 +6,7 @@ from utils.dataloader import Dataset
 
 if __name__ == "__main__":
     input_shape = (416, 416, 3)
-    test_annotation_path = 'test_annotation.txt'
+    test_annotation_path = 'train_annotation.txt'
     classes_path = 'class_name.txt'
     class_names = get_classes(classes_path)
     print('class_names = {}'.format(class_names))
@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     Cuda = True
 
-    model_path = '.\logs\Epoch97-Total_Loss5.4814-Val_Loss5.9695.pth'
+    model_path = './logs/resnet18Epoch244-Total_Loss5.8581-Val_Loss6.9024.pth'
     model = Centernet(num_classes, 'resnet18', pretrain=False)
     model.load_state_dict(torch.load(model_path))
 

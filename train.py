@@ -11,15 +11,15 @@ from utils.tool import val_one_epoch, train_one_epoch, get_classes
 
 if __name__ == "__main__":
     input_shape = (416, 416, 3)
-    train_annotation_path = 'train_annotation.txt'
-    valid_annotation_path = 'valid_annotation.txt'
-    classes_path = 'class_name.txt'
+    train_annotation_path = 'data/train_annotation.txt'
+    valid_annotation_path = 'data/valid_annotation.txt'
+    classes_path = 'data/class_name.txt'
     class_names = get_classes(classes_path)
     print('class_names = {}'.format(class_names))
     num_classes = len(class_names)
     pretrain = True
     Cuda = True
-    backbone = 'resnet50'
+    backbone = 'resnet18'
     model = Centernet(num_classes, backbone, pretrain)
 
     if Cuda:
@@ -35,8 +35,8 @@ if __name__ == "__main__":
     lr = 1e-3
     Batch_size = 8
     Init_Epoch = 0
-    Freeze_Epoch = 30
-    Epoch_Num = 100
+    Freeze_Epoch = 10
+    Epoch_Num = 500
 
     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     model.freeze()
 
     for epoch in range(Init_Epoch, Epoch_Num):
-        if epoch is Freeze_Epoch + 1:
+        if epoch is Freeze_Epoch:
             lr = 1e-3
             optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
             lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
