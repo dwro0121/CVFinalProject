@@ -23,6 +23,16 @@ def augmentor(img, box, img_size):
         iaa.Crop(percent=(0, 0.3), seed=randint(0, 1000))],
         seed=randint(0, 1000)
     )
+
+    # seq = iaa.Sequential([
+    #     iaa.LinearContrast((0.75, 1.25), seed=randint(0, 1000)),
+    #     iaa.Multiply((0.75, 1.25), seed=randint(0, 1000)),
+    #     iaa.Fliplr(0.5, seed=randint(0, 1000)),
+    #     iaa.Affine(scale={"x": (0.5, 1.5), "y": (0.5, 1.5)},
+    #                translate_percent={"x": (-0.25, 0.25), "y": (-0.25, 0.25)},
+    #                cval=(0, 255), )],
+    #     seed=randint(0, 1000)
+    # )
     img_aug, bbs_aug = seq(image=img, bounding_boxes=bbs)
     for i in range(len(bbs_aug.bounding_boxes)):
         after = bbs_aug.bounding_boxes[i]
@@ -33,32 +43,37 @@ def augmentor(img, box, img_size):
     for i in range(len(box)):
         if math.isclose(box[i, 0], box[i, 2]) or math.isclose(box[i, 1], box[i, 3]):
             list_del.append(i)
+    list_del.sort(reverse=True)
+    for i in range(len(list_del)):
+        np.delete(box, i)
     return img, box
 
 
 def preprocess_image(image):
-    mean = [0.22083542, 0.22083542, 0.22083542]
-    std = [0.33068898, 0.3250564, 0.32701415]
+    # return np.float32(image/255.)
+    mean = [0.3915, 0.4243, 0.4478]
+    std = [0.2354, 0.2332, 0.2391]
     return ((np.float32(image) / 255.) - mean) / std
 
 
 class Dataset(Dataset):
-    def __init__(self, train_lines, input_size, num_classes, augment=True):
+    def __init__(self, lines, input_size, num_classes, augment=True, tvt='train'):
         super(Dataset, self).__init__()
 
-        self.train_lines = train_lines
+        self.tvt = tvt
+        self.lines = lines
         self.input_size = input_size
         self.output_size = (int(input_size[0] / 4), int(input_size[1] / 4))
         self.num_classes = num_classes
         self.augment = augment
 
     def __len__(self):
-        return len(self.train_lines)
+        return len(self.lines)
 
     def __getitem__(self, index):
         if index == 0:
-            shuffle(self.train_lines)
-        line = self.train_lines[index].split()
+            shuffle(self.lines)
+        line = self.lines[index].split()
         img = Image.open(line[0])
         box = np.array([np.array(list(map(float, box.split(',')))) for box in line[1:]])
         if self.augment:
@@ -96,9 +111,11 @@ class Dataset(Dataset):
                 batch_reg[ct_int[1], ct_int[0]] = ct - ct_int
                 batch_reg_mask[ct_int[1], ct_int[0]] = 1
 
+        if self.tvt == 'test':
+            return np.array(img)
+
         img = np.array(img, dtype=np.float32)[:, :, ::-1]
         img = np.transpose(preprocess_image(img), (2, 0, 1))
-
         return img, batch_hm, batch_wh, batch_reg, batch_reg_mask
 
 

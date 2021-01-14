@@ -76,8 +76,7 @@ class Centernet_header(nn.Module):
         self.wh_header = Singler_header(64, 2, self.bn_momentum)
 
     def forward(self, x):
-        hm = self.hm_header(x)
-        hm = self.sigmoid(hm)
+        hm = self.hm_header(x).sigmoid_()
         offsets = self.offsets_header(x)
         wh = self.wh_header(x)
         output = {
@@ -91,13 +90,14 @@ class Centernet_header(nn.Module):
 class Singler_header(nn.Module):
     def __init__(self, in_channel, out_channel, bn_momentum):
         super(Singler_header, self).__init__()
-        self.conv = nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1)
+        self.conv = nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1, bias=False)
         self.bn = nn.BatchNorm2d(in_channel, momentum=bn_momentum)
         self.relu = nn.ReLU(inplace=True)
-        self.out = nn.Conv2d(in_channels=in_channel, out_channels=out_channel, kernel_size=1)
+        self.out = nn.Conv2d(in_channels=in_channel, out_channels=out_channel, kernel_size=1, bias=False)
 
     def forward(self, x):
         x = self.conv(x)
+        x = self.bn(x)
         x = self.relu(x)
         x = self.out(x)
 

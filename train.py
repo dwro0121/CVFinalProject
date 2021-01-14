@@ -22,6 +22,11 @@ if __name__ == "__main__":
     backbone = 'resnet18'
     model = Centernet(num_classes, backbone, pretrain)
 
+
+    model_path = './logs/resnet18Epoch100-Total_Loss3.9746-Val_Loss5.7731.pth'
+    model = Centernet(num_classes, 'resnet18', pretrain=False)
+    torch.load(model_path)
+    model.load_state_dict(torch.load(model_path))
     if Cuda:
         model = model.cuda()
 
@@ -35,8 +40,8 @@ if __name__ == "__main__":
     lr = 1e-3
     Batch_size = 8
     Init_Epoch = 0
-    Freeze_Epoch = 10
-    Epoch_Num = 500
+    Freeze_Epoch = 50
+    Epoch_Num = 100
 
     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
@@ -55,10 +60,10 @@ if __name__ == "__main__":
 
     for epoch in range(Init_Epoch, Epoch_Num):
         if epoch is Freeze_Epoch:
-            lr = 1e-3
+            model.unfreeze()
+            lr = 1e-4
             optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
             lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
-            model.unfreeze()
             print("Unfreeze Model")
 
         train_loss = train_one_epoch(model, epoch, epoch_size, train_loader, Epoch_Num, Cuda, optimizer)
