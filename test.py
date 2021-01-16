@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     Cuda = True
 
-    model_path = './logs/resnet18Epoch100-Total_Loss3.9746-Val_Loss5.7731.pth'
+    model_path = './logs/resnet18Epoch22-Total_Loss5.5173-Val_Loss5.8896.pth'
     model = Centernet(num_classes, 'resnet18', pretrain=False)
     torch.load(model_path)
     model.load_state_dict(torch.load(model_path))

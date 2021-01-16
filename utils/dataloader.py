@@ -51,8 +51,8 @@ def augmentor(img, box, img_size):
 
 def preprocess_image(image):
     # return np.float32(image/255.)
-    mean = [0.3915, 0.4243, 0.4478]
-    std = [0.2354, 0.2332, 0.2391]
+    mean = [0.3792, 0.4117, 0.4419]
+    std = [0.2385, 0.2373, 0.2451]
     return ((np.float32(image) / 255.) - mean) / std
 
 

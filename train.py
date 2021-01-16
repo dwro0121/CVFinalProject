@@ -22,11 +22,6 @@ if __name__ == "__main__":
     backbone = 'resnet18'
     model = Centernet(num_classes, backbone, pretrain)
 
-
-    model_path = './logs/resnet18Epoch100-Total_Loss3.9746-Val_Loss5.7731.pth'
-    model = Centernet(num_classes, 'resnet18', pretrain=False)
-    torch.load(model_path)
-    model.load_state_dict(torch.load(model_path))
     if Cuda:
         model = model.cuda()
 

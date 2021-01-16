@@ -182,8 +182,8 @@ def detect_img(net, img, class_names, cuda):
             images = images.cuda()
         ret = net(images)
         hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
-        detected_boxes = process_bbox(hm, wh, offset, 0.05, cuda, 50)
-    detected_boxes = np.array(nms(detected_boxes, 0.05))
+        detected_boxes = process_bbox(hm, wh, offset, 0.01, cuda, 50)
+    detected_boxes = np.array(nms(detected_boxes, 0.3))
     if len(detected_boxes) <= 0:
         return img
     bbox = detected_boxes[0]
@@ -192,7 +192,7 @@ def detect_img(net, img, class_names, cuda):
 
     batch_boxes, conf, label = bbox[:, :4], bbox[:, 4], bbox[:, 5]
     xmin, ymin, xmax, ymax = batch_boxes[:, 0], batch_boxes[:, 1], batch_boxes[:, 2], batch_boxes[:, 3]
-    top_indices = [i for i, cf in enumerate(conf) if cf >= 0.05]
+    top_indices = [i for i, cf in enumerate(conf) if cf >= 0.01]
     top_conf = conf[top_indices]
     top_label_indices = label[top_indices].tolist()
     left, top, right, bottom = np.expand_dims(xmin[top_indices], -1), np.expand_dims(ymin[top_indices],
