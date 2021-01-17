@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 from torch.utils.data.dataset import Dataset
+import os
 
 from utils.tool import gaussian_radius, draw_gaussian
 
@@ -112,7 +113,9 @@ class Dataset(Dataset):
                 batch_reg_mask[ct_int[1], ct_int[0]] = 1
 
         if self.tvt == 'test':
-            return np.array(img)
+            basename = os.path.basename(line[0])
+            basename_no_ext = os.path.splitext(basename)[0]
+            return np.array(img), basename_no_ext
 
         img = np.array(img, dtype=np.float32)[:, :, ::-1]
         img = np.transpose(preprocess_image(img), (2, 0, 1))

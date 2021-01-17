@@ -17,9 +17,8 @@ colors = ["#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])
 
 
 def preprocess_image(image):
-    # return np.float32(image/255.)
-    mean = [0.3915, 0.4243, 0.4478]
-    std = [0.2354, 0.2332, 0.2391]
+    mean = [0.3792, 0.4117, 0.4419]
+    std = [0.2385, 0.2373, 0.2451]
     return ((np.float32(image) / 255.) - mean) / std
 
 
@@ -29,20 +28,22 @@ def draw_gaussian(heatmap, center, radius, k=1):
 
     x, y = int(center[0]), int(center[1])
 
-    height, width = heatmap.shape[0:2]
+    height, width = heatmap.shape[:2]
 
     left, right = min(x, radius), min(width - x, radius + 1)
     top, bottom = min(y, radius), min(height - y, radius + 1)
 
     masked_heatmap = heatmap[y - top:y + bottom, x - left:x + right]
     masked_gaussian = gaussian[radius - top:radius + bottom, radius - left:radius + right]
-    if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:  # TODO debug
+    if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:
         np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
+        heatmap[y - top:y + bottom, x - left:x + right] = masked_heatmap
     return heatmap
 
 
 def gaussian2D(shape, sigma=1):
-    m, n = [(ss - 1.) / 2. for ss in shape]
+    # m, n = [(ss - 1.) / 2. for ss in shape]
+    m, n = shape
     y, x = np.ogrid[-m:m + 1, -n:n + 1]
 
     h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
@@ -162,14 +163,63 @@ def val_one_epoch(net, epoch, epoch_size, val_loader, Epoch_Num, cuda):
 def detect_image(net, test_loader, class_names, cuda):
     net.eval()
     print(len(test_loader))
-    with tqdm(postfix=dict, mininterval=0.3) as pbar:
-        for iteration, data in enumerate(test_loader):
-            with torch.no_grad():
-                img = detect_img(net, Image.fromarray(data[0].numpy()), class_names, cuda)
-                import matplotlib.pyplot as plt
-                plt.imshow(img)
-                plt.show()
+    for iteration, data in enumerate(test_loader):
+        with torch.no_grad():
+            test_centernet(net, Image.fromarray(data[0][0].numpy()), str(data[1][0]), class_names, cuda)
 
+def test_centernet(net, img, basename, class_names, cuda):
+
+    dr_path = './input/detection-results/'+basename+'.txt'
+    file_dr = open(dr_path, 'w')
+    img_shape = np.array(np.shape(img)[0:2])
+    image = np.array(img, dtype=np.float32)[:, :, ::-1]
+    image = np.reshape(np.transpose(preprocess_image(image), (2, 0, 1)), [1, 3, 416, 416])
+    with torch.no_grad():
+        image = np.asarray(image)
+        images = Variable(torch.from_numpy(image).type(torch.FloatTensor))
+        if cuda:
+            images = images.cuda()
+        ret = net(images)
+        hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
+        detected_boxes = process_bbox(hm, wh, offset, 0.01, cuda, 20)
+    detected_boxes = np.array(nms(detected_boxes, 0.3))
+    if len(detected_boxes) <= 0:
+        return
+    bbox = detected_boxes[0]
+    if len(bbox) <= 0:
+        return
+
+    batch_boxes, conf, label = bbox[:, :4], bbox[:, 4], bbox[:, 5]
+    xmin, ymin, xmax, ymax = batch_boxes[:, 0], batch_boxes[:, 1], batch_boxes[:, 2], batch_boxes[:, 3]
+    top_indices = [i for i, cf in enumerate(conf) if cf >= 0.01]
+    top_conf = conf[top_indices]
+    top_label_indices = label[top_indices].tolist()
+    left, top, right, bottom = np.expand_dims(xmin[top_indices], -1), np.expand_dims(ymin[top_indices],
+                                                                                     -1), np.expand_dims(
+        xmax[top_indices], -1), np.expand_dims(ymax[top_indices], -1)
+    box_yx = np.concatenate(((top + bottom) / 2, (left + right) / 2), axis=-1)
+    box_hw = np.concatenate((bottom - top, right - left), axis=-1)
+    box_mins = box_yx - (box_hw / 2.)
+    box_maxes = box_yx + (box_hw / 2.)
+    boxes = np.concatenate([
+        box_mins[:, 0:1],
+        box_mins[:, 1:2],
+        box_maxes[:, 0:1],
+        box_maxes[:, 1:2]
+    ], axis=-1)
+    boxes *= np.concatenate([img_shape, img_shape], axis=-1)
+
+    for i, c in enumerate(top_label_indices):
+        predicted_class = class_names[int(c)]
+        score = top_conf[i]
+
+        top, left, bottom, right = boxes[i]
+
+        top = max(0, np.floor(top + 0.5).astype('int32'))
+        left = max(0, np.floor(left + 0.5).astype('int32'))
+        bottom = min(np.shape(img)[0], np.floor(bottom + 0.5).astype('int32'))
+        right = min(np.shape(img)[1], np.floor(right + 0.5).astype('int32'))
+        file_dr.write('{} {} {} {} {} {}\n'.format(predicted_class, str(score), str(left), str(top), str(right), str(bottom)))
 
 def detect_img(net, img, class_names, cuda):
     img_shape = np.array(np.shape(img)[0:2])
@@ -182,8 +232,8 @@ def detect_img(net, img, class_names, cuda):
             images = images.cuda()
         ret = net(images)
         hm, wh, offset = ret['hm'], ret['wh'], ret['offsets']
-        detected_boxes = process_bbox(hm, wh, offset, 0.01, cuda, 50)
-    detected_boxes = np.array(nms(detected_boxes, 0.3))
+        detected_boxes = process_bbox(hm, wh, offset, 0.05, cuda, 50)
+    detected_boxes = np.array(nms(detected_boxes, 0.1))
     if len(detected_boxes) <= 0:
         return img
     bbox = detected_boxes[0]
@@ -192,7 +242,7 @@ def detect_img(net, img, class_names, cuda):
 
     batch_boxes, conf, label = bbox[:, :4], bbox[:, 4], bbox[:, 5]
     xmin, ymin, xmax, ymax = batch_boxes[:, 0], batch_boxes[:, 1], batch_boxes[:, 2], batch_boxes[:, 3]
-    top_indices = [i for i, cf in enumerate(conf) if cf >= 0.01]
+    top_indices = [i for i, cf in enumerate(conf) if cf >= 0.05]
     top_conf = conf[top_indices]
     top_label_indices = label[top_indices].tolist()
     left, top, right, bottom = np.expand_dims(xmin[top_indices], -1), np.expand_dims(ymin[top_indices],

@@ -17,7 +17,7 @@ if __name__ == "__main__":
     class_names = get_classes(classes_path)
     print('class_names = {}'.format(class_names))
     num_classes = len(class_names)
-    pretrain = True
+    pretrain = False
     Cuda = True
     backbone = 'resnet18'
     model = Centernet(num_classes, backbone, pretrain)
@@ -51,15 +51,15 @@ if __name__ == "__main__":
     epoch_size = num_train // Batch_size
     epoch_size_val = num_val // Batch_size
 
-    model.freeze()
+    # model.freeze()
 
     for epoch in range(Init_Epoch, Epoch_Num):
-        if epoch is Freeze_Epoch:
-            model.unfreeze()
-            lr = 1e-4
-            optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
-            lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
-            print("Unfreeze Model")
+        # if epoch is Freeze_Epoch:
+        #     model.unfreeze()
+        #     lr = 1e-4
+        #     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
+        #     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
+        #     print("Unfreeze Model")
 
         train_loss = train_one_epoch(model, epoch, epoch_size, train_loader, Epoch_Num, Cuda, optimizer)
         print('Start Validation')

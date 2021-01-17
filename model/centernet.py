@@ -70,7 +70,6 @@ class Centernet_header(nn.Module):
         super(Centernet_header, self).__init__()
         self.num_classes = num_classes
         self.bn_momentum =bn_momentum
-        self.sigmoid = nn.Sigmoid()
         self.hm_header = Singler_header(64, self.num_classes, self.bn_momentum)
         self.offsets_header = Singler_header(64, 2, self.bn_momentum)
         self.wh_header = Singler_header(64, 2, self.bn_momentum)
