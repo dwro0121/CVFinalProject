@@ -51,5 +51,5 @@ You can run detect.py to detect objects on the image. Three example images are p
 * imgaug
 
 ### Adapted from: 
-https://github.com/Cartucho/mAP
-https://github.com/xingyizhou/CenterNet
++ https://github.com/Cartucho/mAP  
++ https://github.com/xingyizhou/CenterNet
