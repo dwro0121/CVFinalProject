@@ -160,9 +160,7 @@ def test_centernet(net, img, basename, class_names, cuda):
     for i, c in enumerate(top_label_indices):
         predicted_class = class_names[int(c)]
         score = top_conf[i]
-
         top, left, bottom, right = boxes[i]
-
         top = max(0, np.floor(top + 0.5).astype('int32'))
         left = max(0, np.floor(left + 0.5).astype('int32'))
         bottom = min(np.shape(img)[0], np.floor(bottom + 0.5).astype('int32'))
@@ -257,41 +255,43 @@ def pool(hm, kernel=3):
     return hm * keep
 
 
+def process_box(hm, wh, offset, channel, threshold, size, topk, cuda):
+    h, w = size
+    mesh_y, mesh_x = torch.meshgrid(torch.arange(0, h), torch.arange(0, w))
+    mesh_y, mesh_x = mesh_y.flatten().float(), mesh_x.flatten().float()
+    if cuda:
+        mesh_x = mesh_x.cuda()
+        mesh_y = mesh_y.cuda()
+
+    heat_map = hm.permute(1, 2, 0).view([-1, channel])
+    wh_map = wh.permute(1, 2, 0).view([-1, 2])
+    offset_map = offset.permute(1, 2, 0).view([-1, 2])
+    conf, pred = torch.max(heat_map, dim=-1)
+
+    mask = conf > threshold
+    wh_mask = wh_map[mask]
+    offset_mask = offset_map[mask]
+    if len(wh_mask) == 0:
+        return []
+    x_mask = torch.unsqueeze(mesh_x[mask] + offset_mask[..., 0], -1)
+    y_mask = torch.unsqueeze(mesh_y[mask] + offset_mask[..., 0], -1)
+
+    half_w, half_h = wh_mask[..., 0:1] / 2, wh_mask[..., 1:2] / 2
+    bboxes = torch.cat([x_mask - half_w, y_mask - half_h, x_mask + half_w, y_mask + half_h], dim=1)
+    bboxes[:, [0, 2]] /= w
+    bboxes[:, [1, 3]] /= h
+    detected = torch.cat([bboxes, torch.unsqueeze(conf[mask], -1), torch.unsqueeze(pred[mask], -1).float()], dim=-1)
+    arg_sort = torch.argsort(detected[:, -2], descending=True)
+    detected = detected[arg_sort]
+    return detected.cpu().numpy()[:topk]
+
+
 def process_bbox(hm, wh, offset, threshold, cuda, topk=100):
     pred_hm = pool(hm)
     batch, channel, h, w = pred_hm.shape
     detected_box = []
     for b in range(batch):
-        heat_map = pred_hm[b].permute(1, 2, 0).view([-1, channel])
-        wh_map = wh[b].permute(1, 2, 0).view([-1, 2])
-        offset_map = offset[b].permute(1, 2, 0).view([-1, 2])
-
-        mesh_y, mesh_x = torch.meshgrid(torch.arange(0, h), torch.arange(0, w))
-
-        mesh_x, mesh_y = mesh_x.flatten().float(), mesh_y.flatten().float()
-        if cuda:
-            mesh_x = mesh_x.cuda()
-            mesh_y = mesh_y.cuda()
-
-        conf, pred = torch.max(heat_map, dim=-1)
-        mask = conf > threshold
-
-        wh_mask = wh_map[mask]
-        offset_mask = offset_map[mask]
-        if len(wh_mask) == 0:
-            detected_box.append([])
-            continue
-        x_mask = torch.unsqueeze(mesh_x[mask] + offset_mask[..., 0], -1)
-        y_mask = torch.unsqueeze(mesh_y[mask] + offset_mask[..., 0], -1)
-
-        half_w, half_h = wh_mask[..., 0:1] / 2, wh_mask[..., 1:2] / 2
-        bboxes = torch.cat([x_mask - half_w, y_mask - half_h, x_mask + half_w, y_mask + half_h], dim=1)
-        bboxes[:, [0, 2]] /= w
-        bboxes[:, [1, 3]] /= h
-        detected = torch.cat([bboxes, torch.unsqueeze(conf[mask], -1), torch.unsqueeze(pred[mask], -1).float()], dim=-1)
-        arg_sort = torch.argsort(detected[:, -2], descending=True)
-        detected = detected[arg_sort]
-        detected_box.append(detected.cpu().numpy()[:topk])
+        detected_box.append(process_bbox(pred_hm[b], wh[b], offset[b], channel, threshold, (h, w), topk, cuda))
     return detected_box
 
 
