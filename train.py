@@ -36,10 +36,10 @@ if __name__ == "__main__":
     Batch_size = 8
     Init_Epoch = 0
     Freeze_Epoch = 50
-    Epoch_Num = 100
+    Epoch_Num = 200
 
     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
-    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=4, verbose=True)
 
     train_dataset = Dataset(train_lines, input_shape, num_classes, augment=True)
     val_dataset = Dataset(valid_lines, input_shape, num_classes, augment=False)
@@ -51,15 +51,15 @@ if __name__ == "__main__":
     epoch_size = num_train // Batch_size
     epoch_size_val = num_val // Batch_size
 
-    # model.freeze()
+    model.freeze()
 
     for epoch in range(Init_Epoch, Epoch_Num):
-        # if epoch is Freeze_Epoch:
-        #     model.unfreeze()
-        #     lr = 1e-4
-        #     optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
-        #     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
-        #     print("Unfreeze Model")
+        if epoch is Freeze_Epoch:
+            model.unfreeze()
+            lr = 1e-4
+            optimizer = optim.Adam(model.parameters(), lr, weight_decay=5e-4)
+            lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2, verbose=True)
+            print("Unfreeze Model")
 
         train_loss = train_one_epoch(model, epoch, epoch_size, train_loader, Epoch_Num, Cuda, optimizer)
         print('Start Validation')
@@ -71,6 +71,6 @@ if __name__ == "__main__":
         print('Saving state, iter:', str(epoch + 1))
         if not Path('logs').exists():
             os.mkdir('logs')
-        torch.save(model.state_dict(), 'logs/'+backbone+'Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth' % (
+        torch.save(model.state_dict(), 'logs/' + backbone + 'Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth' % (
             (epoch + 1), train_loss, val_loss))
         lr_scheduler.step(val_loss)

@@ -1,1 +1,0 @@
-['Car', 'Truck', 'Ambulance', 'Bus', 'Motorcycle']

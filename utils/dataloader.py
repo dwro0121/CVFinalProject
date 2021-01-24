@@ -1,4 +1,5 @@
 import math
+import os
 from random import *
 
 import imgaug.augmenters as iaa
@@ -6,9 +7,6 @@ import numpy as np
 from PIL import Image
 from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 from torch.utils.data.dataset import Dataset
-import os
-
-from utils.tool import gaussian_radius, draw_gaussian
 
 
 def augmentor(img, box, img_size):
@@ -25,15 +23,6 @@ def augmentor(img, box, img_size):
         seed=randint(0, 1000)
     )
 
-    # seq = iaa.Sequential([
-    #     iaa.LinearContrast((0.75, 1.25), seed=randint(0, 1000)),
-    #     iaa.Multiply((0.75, 1.25), seed=randint(0, 1000)),
-    #     iaa.Fliplr(0.5, seed=randint(0, 1000)),
-    #     iaa.Affine(scale={"x": (0.5, 1.5), "y": (0.5, 1.5)},
-    #                translate_percent={"x": (-0.25, 0.25), "y": (-0.25, 0.25)},
-    #                cval=(0, 255), )],
-    #     seed=randint(0, 1000)
-    # )
     img_aug, bbs_aug = seq(image=img, bounding_boxes=bbs)
     for i in range(len(bbs_aug.bounding_boxes)):
         after = bbs_aug.bounding_boxes[i]
@@ -51,7 +40,6 @@ def augmentor(img, box, img_size):
 
 
 def preprocess_image(image):
-    # return np.float32(image/255.)
     mean = [0.3792, 0.4117, 0.4419]
     std = [0.2385, 0.2373, 0.2451]
     return ((np.float32(image) / 255.) - mean) / std
@@ -98,15 +86,11 @@ class Dataset(Dataset):
             bbox = np.array(bbox)
             bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.output_size[1] - 1)
             bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.output_size[0] - 1)
-            cls_id = int(box[i, -1])
 
             h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
             if h > 0 and w > 0:
-                radius = gaussian_radius((math.ceil(h), math.ceil(w)))
-                radius = max(0, int(radius))
                 ct = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2], dtype=np.float32)
                 ct_int = ct.astype(np.int32)
-                batch_hm[:, :, cls_id] = draw_gaussian(batch_hm[:, :, cls_id], ct_int, radius)
 
                 batch_wh[ct_int[1], ct_int[0]] = 1. * w, 1. * h
                 batch_reg[ct_int[1], ct_int[0]] = ct - ct_int

@@ -5,11 +5,11 @@ from .backbone import Resnet_Backbone
 
 class Centernet(nn.Module):
 
-    def __init__(self, num_classes=80, model='resnet18',pretrain=True):
+    def __init__(self, num_classes=80, model='resnet18', pretrain=True):
         super(Centernet, self).__init__()
         self.num_classes = num_classes
         self.backbone = Resnet_Backbone(model, pretrain)
-        if model =='resnet18':
+        if model == 'resnet18':
             self.decoder = Centernet_decoder(512)
         else:
             self.decoder = Centernet_decoder(2048)
@@ -69,7 +69,7 @@ class Centernet_header(nn.Module):
     def __init__(self, num_classes=80, bn_momentum=0.1):
         super(Centernet_header, self).__init__()
         self.num_classes = num_classes
-        self.bn_momentum =bn_momentum
+        self.bn_momentum = bn_momentum
         self.hm_header = Singler_header(64, self.num_classes, self.bn_momentum)
         self.offsets_header = Singler_header(64, 2, self.bn_momentum)
         self.wh_header = Singler_header(64, 2, self.bn_momentum)

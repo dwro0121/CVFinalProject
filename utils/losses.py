@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 def focal_loss(output, label, alpha=2, beta=4):
     output = output.permute(0, 2, 3, 1)
     pos_inds = label.eq(1).float()
@@ -25,13 +24,6 @@ def focal_loss(output, label, alpha=2, beta=4):
 
 
 def l1_loss(output, label, mask):
-    '''
-
-    :param output:
-    :param label:
-    :param mask:
-    :return:
-    '''
     output = output.permute(0, 2, 3, 1)
     expand_mask = torch.unsqueeze(mask, -1).repeat(1, 1, 1, 2)
 

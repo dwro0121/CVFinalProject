@@ -22,58 +22,6 @@ def preprocess_image(image):
     return ((np.float32(image) / 255.) - mean) / std
 
 
-def draw_gaussian(heatmap, center, radius, k=1):
-    diameter = 2 * radius + 1
-    gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
-
-    x, y = int(center[0]), int(center[1])
-
-    height, width = heatmap.shape[:2]
-
-    left, right = min(x, radius), min(width - x, radius + 1)
-    top, bottom = min(y, radius), min(height - y, radius + 1)
-
-    masked_heatmap = heatmap[y - top:y + bottom, x - left:x + right]
-    masked_gaussian = gaussian[radius - top:radius + bottom, radius - left:radius + right]
-    if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:
-        np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
-        heatmap[y - top:y + bottom, x - left:x + right] = masked_heatmap
-    return heatmap
-
-
-def gaussian2D(shape, sigma=1):
-    # m, n = [(ss - 1.) / 2. for ss in shape]
-    m, n = shape
-    y, x = np.ogrid[-m:m + 1, -n:n + 1]
-
-    h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
-    h[h < np.finfo(h.dtype).eps * h.max()] = 0
-    return h
-
-
-def gaussian_radius(det_size, min_overlap=0.7):
-    height, width = det_size
-
-    a1 = 1
-    b1 = (height + width)
-    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
-    sq1 = np.sqrt(b1 ** 2 - 4 * a1 * c1)
-    r1 = (b1 + sq1) / 2
-
-    a2 = 4
-    b2 = 2 * (height + width)
-    c2 = (1 - min_overlap) * width * height
-    sq2 = np.sqrt(b2 ** 2 - 4 * a2 * c2)
-    r2 = (b2 + sq2) / 2
-
-    a3 = 4 * min_overlap
-    b3 = -2 * min_overlap * (height + width)
-    c3 = (min_overlap - 1) * width * height
-    sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
-    r3 = (b3 + sq3) / 2
-    return min(r1, r2, r3)
-
-
 def get_classes(classes_path):
     '''loads the classes'''
     with open(classes_path) as f:
@@ -160,16 +108,16 @@ def val_one_epoch(net, epoch, epoch_size, val_loader, Epoch_Num, cuda):
     return val_loss / (epoch_size + 1)
 
 
-def detect_image(net, test_loader, class_names, cuda):
+def test_model(net, test_loader, class_names, cuda):
     net.eval()
     print(len(test_loader))
     for iteration, data in enumerate(test_loader):
         with torch.no_grad():
             test_centernet(net, Image.fromarray(data[0][0].numpy()), str(data[1][0]), class_names, cuda)
 
-def test_centernet(net, img, basename, class_names, cuda):
 
-    dr_path = './input/detection-results/'+basename+'.txt'
+def test_centernet(net, img, basename, class_names, cuda):
+    dr_path = './input/detection-results/' + basename + '.txt'
     file_dr = open(dr_path, 'w')
     img_shape = np.array(np.shape(img)[0:2])
     image = np.array(img, dtype=np.float32)[:, :, ::-1]
@@ -219,7 +167,9 @@ def test_centernet(net, img, basename, class_names, cuda):
         left = max(0, np.floor(left + 0.5).astype('int32'))
         bottom = min(np.shape(img)[0], np.floor(bottom + 0.5).astype('int32'))
         right = min(np.shape(img)[1], np.floor(right + 0.5).astype('int32'))
-        file_dr.write('{} {} {} {} {} {}\n'.format(predicted_class, str(score), str(left), str(top), str(right), str(bottom)))
+        file_dr.write(
+            '{} {} {} {} {} {}\n'.format(predicted_class, str(score), str(left), str(top), str(right), str(bottom)))
+
 
 def detect_img(net, img, class_names, cuda):
     img_shape = np.array(np.shape(img)[0:2])
@@ -391,33 +341,3 @@ def iou(b1, b2):
 
     iou = inter_area / np.maximum((area_b1 + area_b2 - inter_area), 1e-6)
     return iou
-
-
-def process(hm, wh, offset, threshold=0.3, cuda=None, peaks_num=100):
-    if cuda:
-        hmax = nn.functional.max_pool2d(hm, (3, 3), stride=1, padding=1).cuda()
-    else:
-        hmax = nn.functional.max_pool2d(hm, (3, 3), stride=1, padding=1)
-    keep = (hmax == hm).float()
-    mask = (hm > threshold).float()
-    hm = hm * keep * mask
-    b, c, h, w = hm.shape
-    wh = wh.squeeze(0).permute(1, 2, 0).view(-1, 2)
-    offset = offset.squeeze(0).permute(1, 2, 0).view(-1, 2)
-    mesh_w, mesh_h = torch.meshgrid(torch.arange(h), torch.arange(w))
-    if cuda:
-        mesh_w, mesh_h = torch.flatten(mesh_w).float().cuda(), torch.flatten(mesh_h).float().cuda()
-    else:
-        mesh_w, mesh_h = torch.flatten(mesh_w).float(), torch.flatten(mesh_h).float()
-    topk_hm, topk_id = torch.topk(hm.squeeze(0).view(c, -1), peaks_num, dim=1)
-    mesh_w = mesh_w + offset[:, 0]
-    mesh_h = mesh_h + offset[:, 1]
-    half_w = wh[:, 0] / 2
-    half_h = wh[:, 1] / 2
-    bboxes = np.array([[[topk_hm[i, j].item(),
-                         (mesh_w - half_w)[topk_id[i, j]].item() * 4,
-                         (mesh_h - half_h)[topk_id[i, j]].item() * 4,
-                         (mesh_w + half_w)[topk_id[i, j]].item() * 4,
-                         (mesh_h + half_h)[topk_id[i, j]].item() * 4]
-                        for j in range(peaks_num)] for i in range(c)])
-    return bboxes

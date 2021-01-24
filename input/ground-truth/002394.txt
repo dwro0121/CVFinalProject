@@ -1,0 +1,5 @@
+person 78 29 119 54
+person 35 25 55 87
+person 4 25 29 87
+person 16 24 36 87
+cat 102 122 129 143
