@@ -15,9 +15,10 @@ if __name__ == "__main__":
 
     Cuda = True
 
-    # model_path = './logs/resnet18.pth'
-    model_path = 'logs/resnet50.pth'
-    model = Centernet(num_classes, 'resnet50', pretrain=False)
+    backbone = 'resnet50'
+
+    model_path = './logs/centernet_'+backbone.replace('net','')+'.pth'
+    model = Centernet(num_classes, 'backbone', pretrain=False)
     torch.load(model_path)
     model.load_state_dict(torch.load(model_path))
 

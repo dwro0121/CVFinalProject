@@ -1,0 +1,1 @@
+Folder for valid set of VOC2007
