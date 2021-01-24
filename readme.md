@@ -32,14 +32,14 @@ You can run detect.py to detect objects on the image. Three example images are p
 |ResNet-18     | 25.72    |   [centernet_res18.pth](https://pan.baidu.com/s/1fyNGoC5LOYQ4tLQj8Hw48Q)  |  dv7p  | 
 |ResNet-50     | 25.56    |   [centernet_res50.pth](https://pan.baidu.com/s/1O_Ono6YBziLo5MgjAZQvNA)  |  mt7b  | 
 
-#####mAP of Centernet with ResNet-18<br>
+##### mAP of Centernet with ResNet-18<br>
 ![centernet_res18_mAP](./result/res18_mAP.png)<br>
 
 
-#####mAP of Centernet with ResNet-50<br>
+##### mAP of Centernet with ResNet-50<br>
 ![centernet_res50_mAP](./result/res50_mAP.png)<br>
 
-###Requirements
+### Requirements
 >
 * Python >= 3.6
 * PyTorch >= 1.7
