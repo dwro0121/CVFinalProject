@@ -19,11 +19,15 @@ You can run the training by setting the backbone, file path, lr, etc. within the
 
 ### 3.Test
 
-After completing the training, or after downloading the already trained model file provided below, put it in the logs folder, and run the test.py file to run the test. Running the test.py file stores the model's predictions in input/detection-results, and you can run mAP.py to calculate the mAP.
+After completing the training, or after downloading the already trained model file provided below, put it in the logs folder, and run the test.py file to run the test. 
+
+Running the test.py file stores the model's predictions in input/detection-results, and you can run mAP.py to calculate the mAP.
 
 ### 4.Detect Image
 
-You can run detect.py to detect objects on the image. Three example images are provided in our repo, and are stored in data/example/. If you want to use a different images, you can edit the img_path of the detect.py file.
+You can run detect.py to detect objects on the image. Three example images are provided in our repo, and are stored in data/example/. 
+
+If you want to use a different images, you can edit the img_path of the detect.py file.
 
 ### Results
 
